@@ -103,7 +103,7 @@ async function initDatabase() {
   db.run(`CREATE TABLE IF NOT EXISTS funding_plans (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     clientId INTEGER NOT NULL,
-    planType TEXT CHECK(planType IN ('credit_optimization','funding_sequence','full')),
+    planType TEXT CHECK(planType IN ('credit_optimization','funding_sequence','full','full_plan')),
     planContent TEXT,
     status TEXT DEFAULT 'draft' CHECK(status IN ('draft','active','completed')),
     createdAt TEXT DEFAULT (datetime('now')),
@@ -197,7 +197,9 @@ function dbGet(sql, params = []) {
 function dbRun(sql, params = []) {
   db.run(sql, params);
   persistDb();
-  return { lastId: db.exec("SELECT last_insert_rowid() AS id")[0]?.values[0][0] };
+  const result = db.exec("SELECT last_insert_rowid() AS id");
+  const lastId = result[0]?.values[0]?.[0];
+  return { lastId: Number(lastId) };
 }
 
 // ---------------------------------------------------------------------------
@@ -518,8 +520,12 @@ app.post('/api/clients', (req, res) => {
         c.notes || null, now, now,
       ]
     );
-    const client = dbGet('SELECT * FROM clients WHERE id = ?', [lastId]);
-    res.status(201).json(client);
+    // Fetch the newly created client — fallback to MAX(id) if lastId fails
+    let client = dbGet('SELECT * FROM clients WHERE id = ?', [lastId]);
+    if (!client) {
+      client = dbGet('SELECT * FROM clients ORDER BY id DESC LIMIT 1');
+    }
+    res.status(201).json(client || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
