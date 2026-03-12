@@ -197,9 +197,14 @@ function dbGet(sql, params = []) {
 function dbRun(sql, params = []) {
   db.run(sql, params);
   persistDb();
-  const result = db.exec("SELECT last_insert_rowid() AS id");
-  const lastId = result[0]?.values[0]?.[0];
-  return { lastId: Number(lastId) };
+  // sql.js uses getRowsModified() for affected rows; for lastId use exec
+  try {
+    const result = db.exec("SELECT last_insert_rowid() AS id");
+    const raw = result[0]?.values[0]?.[0];
+    return { lastId: typeof raw === 'bigint' ? Number(raw) : (raw || 0) };
+  } catch (e) {
+    return { lastId: 0 };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1290,8 +1295,9 @@ app.post('/api/clients/:id/create-login', (req, res) => {
       [req.params.id, email, password, now]
     );
 
-    const login = dbGet('SELECT * FROM client_logins WHERE id = ?', [lastId]);
-    res.status(201).json({ id: login.id, clientId: login.clientId, email: login.email, createdAt: login.createdAt });
+    let login = dbGet('SELECT * FROM client_logins WHERE id = ?', [lastId]);
+    if (!login) login = dbGet('SELECT * FROM client_logins WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(login ? { id: login.id, clientId: login.clientId, email: login.email, createdAt: login.createdAt } : { success: true });
   } catch (err) {
     if (err.message && err.message.includes('UNIQUE')) {
       return res.status(400).json({ error: 'Email already in use' });
