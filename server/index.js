@@ -787,6 +787,23 @@ Generate a detailed, personalized ${planType.replace(/_/g, ' ')} plan with speci
   }
 });
 
+app.put('/api/funding-plans/:id', (req, res) => {
+  try {
+    const plan = dbGet('SELECT * FROM funding_plans WHERE id = ?', [req.params.id]);
+    if (!plan) return res.status(404).json({ error: 'Plan not found' });
+    const { status, planContent } = req.body;
+    const now = new Date().toISOString();
+    dbRun(
+      'UPDATE funding_plans SET status = ?, planContent = ?, updatedAt = ? WHERE id = ?',
+      [status ?? plan.status, planContent ?? plan.planContent, now, req.params.id]
+    );
+    const updated = dbGet('SELECT * FROM funding_plans WHERE id = ?', [req.params.id]);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Applications
 // ---------------------------------------------------------------------------
