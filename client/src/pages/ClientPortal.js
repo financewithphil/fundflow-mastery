@@ -165,10 +165,18 @@ function ProfileTab({ clientId }) {
   if (!profile) return <div className="empty-state"><h3>Profile not found</h3><p>Please contact your team for assistance.</p></div>;
 
   const bureaus = ['Experian', 'Equifax', 'TransUnion'];
-  const creditScores = profile.creditScores || {};
-  const inquiries = profile.inquiries || {};
+  const creditScoreMap = {
+    Experian: profile.creditScoreExperian,
+    Equifax: profile.creditScoreEquifax,
+    TransUnion: profile.creditScoreTransUnion,
+  };
+  const inquiryMap = {
+    Experian: profile.totalInquiriesExperian,
+    Equifax: profile.totalInquiriesEquifax,
+    TransUnion: profile.totalInquiriesTransUnion,
+  };
 
-  const setupSteps = setup?.steps || [];
+  const setupSteps = Array.isArray(setup) ? setup : (setup?.steps || []);
   const completedSteps = setupSteps.filter(s => s.status === 'completed').length;
   const totalSteps = setupSteps.length || 9;
   const progressPct = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
@@ -182,7 +190,7 @@ function ProfileTab({ clientId }) {
         </div>
         <div className="cp-scores-grid">
           {bureaus.map((bureau) => {
-            const score = creditScores[bureau] || creditScores[bureau.toLowerCase()] || 0;
+            const score = creditScoreMap[bureau] || 0;
             return (
               <div key={bureau} className="credit-score-card">
                 <div className="score-ring" style={{ borderColor: scoreColor(score), background: scoreBg(score) }}>
@@ -202,7 +210,7 @@ function ProfileTab({ clientId }) {
         </div>
         <div className="cp-scores-grid">
           {bureaus.map((bureau) => {
-            const count = inquiries[bureau] || inquiries[bureau.toLowerCase()] || 0;
+            const count = inquiryMap[bureau] || 0;
             const max = 3;
             return (
               <div key={bureau} className="bureau-card">
@@ -222,7 +230,7 @@ function ProfileTab({ clientId }) {
       <div className="detail-grid" style={{ marginBottom: 24 }}>
         <div className="detail-section">
           <div className="detail-section-title">Personal Information</div>
-          <div className="detail-row"><span className="detail-label">Name</span><span className="detail-value">{profile.name || '--'}</span></div>
+          <div className="detail-row"><span className="detail-label">Name</span><span className="detail-value">{profile.firstName && profile.lastName ? `${profile.firstName} ${profile.lastName}` : '--'}</span></div>
           <div className="detail-row"><span className="detail-label">Email</span><span className="detail-value">{profile.email || '--'}</span></div>
           <div className="detail-row"><span className="detail-label">Phone</span><span className="detail-value">{profile.phone || '--'}</span></div>
           <div className="detail-row"><span className="detail-label">Address</span><span className="detail-value">{profile.address || '--'}</span></div>
@@ -234,11 +242,11 @@ function ProfileTab({ clientId }) {
           <div className="detail-row"><span className="detail-label">Business Name</span><span className="detail-value">{profile.businessName || '--'}</span></div>
           <div className="detail-row"><span className="detail-label">Entity Type</span><span className="detail-value">{profile.entityType || '--'}</span></div>
           <div className="detail-row"><span className="detail-label">EIN</span><span className="detail-value">{profile.ein || '--'}</span></div>
-          <div className="detail-row"><span className="detail-label">NAICS</span><span className="detail-value">{profile.naics || '--'}</span></div>
-          <div className="detail-row"><span className="detail-label">State</span><span className="detail-value">{profile.businessState || '--'}</span></div>
-          <div className="detail-row"><span className="detail-label">Business Address</span><span className="detail-value">{profile.businessAddress || '--'}</span></div>
-          <div className="detail-row"><span className="detail-label">Domain</span><span className="detail-value">{profile.domain || '--'}</span></div>
-          <div className="detail-row"><span className="detail-label">Website</span><span className="detail-value">{profile.website || '--'}</span></div>
+          <div className="detail-row"><span className="detail-label">NAICS</span><span className="detail-value">{profile.naicsCode || '--'}</span></div>
+          <div className="detail-row"><span className="detail-label">State</span><span className="detail-value">{profile.bizState || '--'}</span></div>
+          <div className="detail-row"><span className="detail-label">Business Address</span><span className="detail-value">{profile.bizAddress || '--'}</span></div>
+          <div className="detail-row"><span className="detail-label">Domain</span><span className="detail-value">{profile.bizDomain || '--'}</span></div>
+          <div className="detail-row"><span className="detail-label">Website</span><span className="detail-value">{profile.bizWebsite || '--'}</span></div>
         </div>
       </div>
 
@@ -255,12 +263,12 @@ function ProfileTab({ clientId }) {
         {setupSteps.map((step, i) => {
           const statusIcon = step.status === 'completed' ? '\u2713' : step.status === 'in_progress' ? '\u25CF' : '\u25CB';
           const statusClass = step.status === 'completed' ? 'completed' : step.status === 'in_progress' ? 'in-progress' : '';
-          const desc = STEP_DESCRIPTIONS[step.name] || step.description || '';
+          const desc = STEP_DESCRIPTIONS[step.stepName] || STEP_DESCRIPTIONS[step.name] || step.description || '';
           return (
             <div key={i} className="step-item">
               <div className={`step-number ${statusClass}`}>{step.status === 'completed' ? statusIcon : i + 1}</div>
               <div className="step-content">
-                <div className="step-name">{step.name}</div>
+                <div className="step-name">{step.stepName || step.name}</div>
                 <div className="step-desc">{desc}</div>
                 {step.notes && <div className="step-desc" style={{ marginTop: 4, fontStyle: 'italic', color: 'var(--text-secondary)' }}>{step.notes}</div>}
               </div>
@@ -292,10 +300,10 @@ function FundingPlanTab({ clientId }) {
     setError('');
     Promise.all([
       api(`/api/portal/funding-plan/${clientId}`).catch(() => null),
-      api(`/api/portal/applications/${clientId}`).catch(() => ({ applications: [] })),
+      api(`/api/portal/applications/${clientId}`).catch(() => []),
     ]).then(([planData, appData]) => {
       setPlan(planData);
-      setApplications(appData?.applications || []);
+      setApplications(Array.isArray(appData) ? appData : (appData?.applications || []));
     }).catch((err) => {
       setError(err.message);
     }).finally(() => {
@@ -329,13 +337,13 @@ function FundingPlanTab({ clientId }) {
   return (
     <div>
       {/* Funding Plan Display */}
-      {plan && plan.plan ? (
+      {plan && plan.planContent ? (
         <div className="card" style={{ marginBottom: 24 }}>
           <div className="card-header">
             <h3 className="card-title">Your Funding Plan</h3>
             {plan.status && <span className={`badge badge-${plan.status}`}>{plan.status}</span>}
           </div>
-          <div className="plan-content">{plan.plan}</div>
+          <div className="plan-content">{plan.planContent}</div>
         </div>
       ) : (
         <div className="card" style={{ marginBottom: 24 }}>
@@ -420,7 +428,7 @@ function FundingPlanTab({ clientId }) {
                 <div className="app-card-details">
                   {app.product && <span className="app-card-detail">Product: {app.product}</span>}
                   {app.bureau && <span className={`badge badge-bureau badge-${app.bureau}`}>{app.bureau}</span>}
-                  {app.date && <span className="app-card-detail">Submitted: {new Date(app.date).toLocaleDateString()}</span>}
+                  {app.dateApplied && <span className="app-card-detail">Submitted: {new Date(app.dateApplied).toLocaleDateString()}</span>}
                 </div>
               </div>
             ))}
@@ -446,7 +454,7 @@ function FundingPlanTab({ clientId }) {
                     <div className="app-card-details">
                       {app.product && <span className="app-card-detail">Product: {app.product}</span>}
                       {app.bureau && <span className={`badge badge-bureau badge-${app.bureau}`}>{app.bureau}</span>}
-                      {app.date && <span className="app-card-detail">Date: {new Date(app.date).toLocaleDateString()}</span>}
+                      {app.dateApplied && <span className="app-card-detail">Date: {new Date(app.dateApplied).toLocaleDateString()}</span>}
                       {app.status === 'approved' && app.approvedAmount && (
                         <span className="app-card-detail app-card-amount">Approved: {formatCurrency(app.approvedAmount)}</span>
                       )}
@@ -469,10 +477,10 @@ function FundingPlanTab({ clientId }) {
                           <li>Ask them to reconsider your application.</li>
                         </ol>
                       </div>
-                      {app.reconNotes && (
+                      {app.nextSteps && (
                         <div className="recon-notes">
                           <strong>Recommended Next Steps:</strong>
-                          <p>{app.reconNotes}</p>
+                          <p>{app.nextSteps}</p>
                         </div>
                       )}
                     </div>
@@ -504,7 +512,7 @@ function CreditChangesTab({ clientId }) {
     setLoading(true);
     setError('');
     api(`/api/portal/credit-changes/${clientId}`)
-      .then((data) => setChanges(data.changes || []))
+      .then((data) => setChanges(Array.isArray(data) ? data : (data.changes || [])))
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, [clientId]);
@@ -527,7 +535,7 @@ function CreditChangesTab({ clientId }) {
   // Group by month
   const grouped = {};
   changes.forEach((c) => {
-    const d = new Date(c.date);
+    const d = new Date(c.changeDate);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const label = d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
     if (!grouped[key]) grouped[key] = { label, items: [] };
@@ -552,7 +560,7 @@ function CreditChangesTab({ clientId }) {
                 <div key={i} className="timeline-item">
                   <div className="timeline-dot" style={{ background: arrowColor }} />
                   <div className="timeline-content">
-                    <div className="timeline-date">{new Date(change.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
+                    <div className="timeline-date">{new Date(change.changeDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</div>
                     <div className="timeline-main">
                       <span className={`badge badge-bureau badge-${change.bureau}`}>{change.bureau}</span>
                       <span className="timeline-score-change">
@@ -563,7 +571,7 @@ function CreditChangesTab({ clientId }) {
                       </span>
                     </div>
                     {change.factor && <div className="timeline-factor"><strong>Factor:</strong> {change.factor}</div>}
-                    {change.recommendedAction && <div className="timeline-action"><strong>Action:</strong> {change.recommendedAction}</div>}
+                    {change.action && <div className="timeline-action"><strong>Action:</strong> {change.action}</div>}
                   </div>
                 </div>
               );

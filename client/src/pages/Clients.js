@@ -2,12 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api, formatCurrency } from '../App';
 
 const EMPTY_CLIENT = {
-  first_name: '', last_name: '', email: '', phone: '', address: '', city: '', state: '', zip: '',
+  firstName: '', lastName: '', email: '', phone: '', address: '', city: '', state: '', zip: '',
   ssn_last4: '', dob: '',
-  credit_score_experian: '', credit_score_equifax: '', credit_score_transunion: '',
-  inquiries_experian: 0, inquiries_equifax: 0, inquiries_transunion: 0,
-  business_name: '', entity_type: '', ein: '', naics_code: '', annual_revenue: '',
-  business_state: '', business_address: '', business_city: '', business_zip: '',
+  creditScoreExperian: '', creditScoreEquifax: '', creditScoreTransUnion: '',
+  totalInquiriesExperian: 0, totalInquiriesEquifax: 0, totalInquiriesTransUnion: 0,
+  businessName: '', entityType: '', ein: '', naicsCode: '', bizRevenue: '',
+  bizState: '', bizAddress: '', bizCity: '', bizZip: '',
   notes: '',
 };
 
@@ -118,10 +118,10 @@ export default function Clients({ navigate, context }) {
   const filteredClients = clients.filter((c) => {
     const q = search.toLowerCase();
     return (
-      (c.first_name || '').toLowerCase().includes(q) ||
-      (c.last_name || '').toLowerCase().includes(q) ||
+      (c.firstName || '').toLowerCase().includes(q) ||
+      (c.lastName || '').toLowerCase().includes(q) ||
       (c.email || '').toLowerCase().includes(q) ||
-      (c.business_name || '').toLowerCase().includes(q)
+      (c.businessName || '').toLowerCase().includes(q)
     );
   });
 
@@ -177,18 +177,18 @@ export default function Clients({ navigate, context }) {
               <tbody>
                 {filteredClients.map((c) => (
                   <tr key={c.id} onClick={() => openDetail(c)}>
-                    <td style={{ fontWeight: 600 }}>{c.first_name} {c.last_name}</td>
+                    <td style={{ fontWeight: 600 }}>{c.firstName} {c.lastName}</td>
                     <td style={{ color: 'var(--text-muted)' }}>{c.email}</td>
-                    <td>{c.business_name || <span style={{ color: 'var(--text-muted)' }}>--</span>}</td>
+                    <td>{c.businessName || <span style={{ color: 'var(--text-muted)' }}>--</span>}</td>
                     <td>
-                      <span style={{ color: 'var(--info)' }}>{c.credit_score_experian || '--'}</span>
+                      <span style={{ color: 'var(--info)' }}>{c.creditScoreExperian || '--'}</span>
                       {' / '}
-                      <span style={{ color: '#a855f7' }}>{c.credit_score_equifax || '--'}</span>
+                      <span style={{ color: '#a855f7' }}>{c.creditScoreEquifax || '--'}</span>
                       {' / '}
-                      <span style={{ color: '#2dd4bf' }}>{c.credit_score_transunion || '--'}</span>
+                      <span style={{ color: '#2dd4bf' }}>{c.creditScoreTransUnion || '--'}</span>
                     </td>
                     <td>
-                      {(c.inquiries_experian || 0) + (c.inquiries_equifax || 0) + (c.inquiries_transunion || 0)} total
+                      {(c.totalInquiriesExperian || 0) + (c.totalInquiriesEquifax || 0) + (c.totalInquiriesTransUnion || 0)} total
                     </td>
                     <td>
                       <div className="btn-group" onClick={(e) => e.stopPropagation()}>
@@ -213,7 +213,7 @@ export default function Clients({ navigate, context }) {
               </div>
               <div className="modal-body">
                 <p className="confirm-text">
-                  Are you sure you want to delete <span className="confirm-name">{deleteModal.first_name} {deleteModal.last_name}</span>?
+                  Are you sure you want to delete <span className="confirm-name">{deleteModal.firstName} {deleteModal.lastName}</span>?
                   This action cannot be undone.
                 </p>
               </div>
@@ -248,11 +248,11 @@ export default function Clients({ navigate, context }) {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">First Name *</label>
-                <input className="form-input" required value={formData.first_name} onChange={onChange('first_name')} />
+                <input className="form-input" required value={formData.firstName} onChange={onChange('firstName')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Last Name *</label>
-                <input className="form-input" required value={formData.last_name} onChange={onChange('last_name')} />
+                <input className="form-input" required value={formData.lastName} onChange={onChange('lastName')} />
               </div>
             </div>
             <div className="form-row">
@@ -301,29 +301,29 @@ export default function Clients({ navigate, context }) {
             <div className="form-row-3">
               <div className="form-group">
                 <label className="form-label">Experian Score</label>
-                <input className="form-input" type="number" min="300" max="850" value={formData.credit_score_experian} onChange={onChange('credit_score_experian')} />
+                <input className="form-input" type="number" min="300" max="850" value={formData.creditScoreExperian} onChange={onChange('creditScoreExperian')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Equifax Score</label>
-                <input className="form-input" type="number" min="300" max="850" value={formData.credit_score_equifax} onChange={onChange('credit_score_equifax')} />
+                <input className="form-input" type="number" min="300" max="850" value={formData.creditScoreEquifax} onChange={onChange('creditScoreEquifax')} />
               </div>
               <div className="form-group">
                 <label className="form-label">TransUnion Score</label>
-                <input className="form-input" type="number" min="300" max="850" value={formData.credit_score_transunion} onChange={onChange('credit_score_transunion')} />
+                <input className="form-input" type="number" min="300" max="850" value={formData.creditScoreTransUnion} onChange={onChange('creditScoreTransUnion')} />
               </div>
             </div>
             <div className="form-row-3">
               <div className="form-group">
                 <label className="form-label">Experian Inquiries</label>
-                <input className="form-input" type="number" min="0" value={formData.inquiries_experian} onChange={onChange('inquiries_experian')} />
+                <input className="form-input" type="number" min="0" value={formData.totalInquiriesExperian} onChange={onChange('totalInquiriesExperian')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Equifax Inquiries</label>
-                <input className="form-input" type="number" min="0" value={formData.inquiries_equifax} onChange={onChange('inquiries_equifax')} />
+                <input className="form-input" type="number" min="0" value={formData.totalInquiriesEquifax} onChange={onChange('totalInquiriesEquifax')} />
               </div>
               <div className="form-group">
                 <label className="form-label">TransUnion Inquiries</label>
-                <input className="form-input" type="number" min="0" value={formData.inquiries_transunion} onChange={onChange('inquiries_transunion')} />
+                <input className="form-input" type="number" min="0" value={formData.totalInquiriesTransUnion} onChange={onChange('totalInquiriesTransUnion')} />
               </div>
             </div>
 
@@ -332,11 +332,11 @@ export default function Clients({ navigate, context }) {
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Business Name</label>
-                <input className="form-input" value={formData.business_name} onChange={onChange('business_name')} />
+                <input className="form-input" value={formData.businessName} onChange={onChange('businessName')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Entity Type</label>
-                <select className="form-select" value={formData.entity_type} onChange={onChange('entity_type')}>
+                <select className="form-select" value={formData.entityType} onChange={onChange('entityType')}>
                   <option value="">Select...</option>
                   <option value="LLC">LLC</option>
                   <option value="S-Corp">S-Corp</option>
@@ -354,31 +354,31 @@ export default function Clients({ navigate, context }) {
               </div>
               <div className="form-group">
                 <label className="form-label">NAICS Code</label>
-                <input className="form-input" value={formData.naics_code} onChange={onChange('naics_code')} />
+                <input className="form-input" value={formData.naicsCode} onChange={onChange('naicsCode')} />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Annual Revenue</label>
-                <input className="form-input" type="number" value={formData.annual_revenue} onChange={onChange('annual_revenue')} />
+                <input className="form-input" type="number" value={formData.bizRevenue} onChange={onChange('bizRevenue')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Business State</label>
-                <input className="form-input" value={formData.business_state} onChange={onChange('business_state')} maxLength={2} />
+                <input className="form-input" value={formData.bizState} onChange={onChange('bizState')} maxLength={2} />
               </div>
             </div>
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Business Address</label>
-                <input className="form-input" value={formData.business_address} onChange={onChange('business_address')} />
+                <input className="form-input" value={formData.bizAddress} onChange={onChange('bizAddress')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Business City</label>
-                <input className="form-input" value={formData.business_city} onChange={onChange('business_city')} />
+                <input className="form-input" value={formData.bizCity} onChange={onChange('bizCity')} />
               </div>
               <div className="form-group">
                 <label className="form-label">Business ZIP</label>
-                <input className="form-input" value={formData.business_zip} onChange={onChange('business_zip')} />
+                <input className="form-input" value={formData.bizZip} onChange={onChange('bizZip')} />
               </div>
             </div>
 
@@ -413,8 +413,8 @@ export default function Clients({ navigate, context }) {
       <div>
         <div className="page-header">
           <div>
-            <h1 className="page-title">{c.first_name} {c.last_name}</h1>
-            <p className="page-subtitle">{c.business_name || 'No business on file'}{c.email ? ` \u2022 ${c.email}` : ''}</p>
+            <h1 className="page-title">{c.firstName} {c.lastName}</h1>
+            <p className="page-subtitle">{c.businessName || 'No business on file'}{c.email ? ` \u2022 ${c.email}` : ''}</p>
           </div>
           <div className="btn-group">
             <button className="btn btn-secondary" onClick={() => setView('list')}>Back to List</button>
@@ -428,27 +428,27 @@ export default function Clients({ navigate, context }) {
         <div className="bureau-health">
           <div className="bureau-card">
             <div className="bureau-card-name" style={{ color: '#60a5fa' }}>Experian</div>
-            <div className={`bureau-card-count ${getInquiryColor(c.inquiries_experian || 0)}`}>
-              {c.inquiries_experian || 0}
+            <div className={`bureau-card-count ${getInquiryColor(c.totalInquiriesExperian || 0)}`}>
+              {c.totalInquiriesExperian || 0}
             </div>
             <div className="bureau-card-max">of 3 max inquiries</div>
-            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>{c.credit_score_experian || '--'}</div>
+            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>{c.creditScoreExperian || '--'}</div>
           </div>
           <div className="bureau-card">
             <div className="bureau-card-name" style={{ color: '#a855f7' }}>Equifax</div>
-            <div className={`bureau-card-count ${getInquiryColor(c.inquiries_equifax || 0)}`}>
-              {c.inquiries_equifax || 0}
+            <div className={`bureau-card-count ${getInquiryColor(c.totalInquiriesEquifax || 0)}`}>
+              {c.totalInquiriesEquifax || 0}
             </div>
             <div className="bureau-card-max">of 3 max inquiries</div>
-            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>{c.credit_score_equifax || '--'}</div>
+            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>{c.creditScoreEquifax || '--'}</div>
           </div>
           <div className="bureau-card">
             <div className="bureau-card-name" style={{ color: '#2dd4bf' }}>TransUnion</div>
-            <div className={`bureau-card-count ${getInquiryColor(c.inquiries_transunion || 0)}`}>
-              {c.inquiries_transunion || 0}
+            <div className={`bureau-card-count ${getInquiryColor(c.totalInquiriesTransUnion || 0)}`}>
+              {c.totalInquiriesTransUnion || 0}
             </div>
             <div className="bureau-card-max">of 3 max inquiries</div>
-            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>{c.credit_score_transunion || '--'}</div>
+            <div style={{ marginTop: 8, fontSize: 14, fontWeight: 600 }}>{c.creditScoreTransUnion || '--'}</div>
           </div>
         </div>
 
@@ -465,12 +465,12 @@ export default function Clients({ navigate, context }) {
           {/* Business Info */}
           <div className="detail-section">
             <div className="detail-section-title">Business Information</div>
-            <div className="detail-row"><span className="detail-label">Business</span><span className="detail-value">{c.business_name || '--'}</span></div>
-            <div className="detail-row"><span className="detail-label">Entity</span><span className="detail-value">{c.entity_type || '--'}</span></div>
+            <div className="detail-row"><span className="detail-label">Business</span><span className="detail-value">{c.businessName || '--'}</span></div>
+            <div className="detail-row"><span className="detail-label">Entity</span><span className="detail-value">{c.entityType || '--'}</span></div>
             <div className="detail-row"><span className="detail-label">EIN</span><span className="detail-value">{c.ein || '--'}</span></div>
-            <div className="detail-row"><span className="detail-label">NAICS</span><span className="detail-value">{c.naics_code || '--'}</span></div>
-            <div className="detail-row"><span className="detail-label">Revenue</span><span className="detail-value">{c.annual_revenue ? formatCurrency(c.annual_revenue) : '--'}</span></div>
-            <div className="detail-row"><span className="detail-label">State</span><span className="detail-value">{c.business_state || '--'}</span></div>
+            <div className="detail-row"><span className="detail-label">NAICS</span><span className="detail-value">{c.naicsCode || '--'}</span></div>
+            <div className="detail-row"><span className="detail-label">Revenue</span><span className="detail-value">{c.bizRevenue ? formatCurrency(c.bizRevenue) : '--'}</span></div>
+            <div className="detail-row"><span className="detail-label">State</span><span className="detail-value">{c.bizState || '--'}</span></div>
           </div>
         </div>
 
@@ -489,11 +489,11 @@ export default function Clients({ navigate, context }) {
                 <tbody>
                   {clientDisputes.map((d) => (
                     <tr key={d.id}>
-                      <td>{d.dispute_type || d.type}</td>
+                      <td>{d.type || d.dispute_type}</td>
                       <td><span className={`badge-bureau badge-${d.bureau}`}>{d.bureau}</span></td>
-                      <td>{d.creditor_name}</td>
+                      <td>{d.creditorName}</td>
                       <td><span className={`badge badge-${d.status}`}>{d.status}</span></td>
-                      <td>{d.created_at ? new Date(d.created_at).toLocaleDateString() : '--'}</td>
+                      <td>{d.createdAt ? new Date(d.createdAt).toLocaleDateString() : '--'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -517,9 +517,9 @@ export default function Clients({ navigate, context }) {
                 <tbody>
                   {clientPlans.map((p) => (
                     <tr key={p.id}>
-                      <td>{p.plan_type || p.type}</td>
+                      <td>{p.planType || p.type}</td>
                       <td><span className={`badge badge-${p.status}`}>{p.status}</span></td>
-                      <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : '--'}</td>
+                      <td>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '--'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -535,16 +535,19 @@ export default function Clients({ navigate, context }) {
               <h3 className="card-title">Business Setup Progress</h3>
               <button className="btn btn-sm btn-secondary" onClick={() => navigate('business', { clientId: c.id })}>View Setup</button>
             </div>
-            {clientSetup.steps && (
-              <div>
-                <div className="progress-bar-wrapper">
-                  <div className="progress-bar" style={{ width: `${(clientSetup.steps.filter(s => s.status === 'completed').length / clientSetup.steps.length) * 100}%` }} />
+            {(() => {
+              const steps = Array.isArray(clientSetup) ? clientSetup : (clientSetup.steps || []);
+              return steps.length > 0 ? (
+                <div>
+                  <div className="progress-bar-wrapper">
+                    <div className="progress-bar" style={{ width: `${(steps.filter(s => s.status === 'completed').length / steps.length) * 100}%` }} />
+                  </div>
+                  <div className="progress-text">
+                    {steps.filter(s => s.status === 'completed').length} of {steps.length} completed
+                  </div>
                 </div>
-                <div className="progress-text">
-                  {clientSetup.steps.filter(s => s.status === 'completed').length} of {clientSetup.steps.length} completed
-                </div>
-              </div>
-            )}
+              ) : null;
+            })()}
           </div>
         )}
 
