@@ -964,6 +964,28 @@ app.put('/api/applications/:id', (req, res) => {
   }
 });
 
+app.delete('/api/applications/:id', (req, res) => {
+  try {
+    const existing = dbGet('SELECT * FROM applications WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Application not found' });
+    dbRun('DELETE FROM applications WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/funding-plans/:id', (req, res) => {
+  try {
+    const existing = dbGet('SELECT * FROM funding_plans WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Plan not found' });
+    dbRun('DELETE FROM funding_plans WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/clients/:id/application-stats', (req, res) => {
   try {
     const clientId = req.params.id;
