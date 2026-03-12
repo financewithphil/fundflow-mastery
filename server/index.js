@@ -583,6 +583,78 @@ app.delete('/api/clients/:id', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
+app.get('/api/dashboard/stats', (req, res) => {
+  try {
+    const clients = dbAll('SELECT * FROM clients');
+    const disputes = dbAll('SELECT * FROM disputes');
+    const apps = dbAll('SELECT * FROM applications');
+    const plans = dbAll('SELECT * FROM funding_plans');
+
+    const activeDisputes = disputes.filter(d => d.status !== 'completed' && d.status !== 'resolved').length;
+    const approvedApps = apps.filter(a => a.status === 'approved');
+    const totalApprovedFunding = approvedApps.reduce((sum, a) => sum + (a.approvedAmount || 0), 0);
+    const pendingApplications = apps.filter(a => a.status === 'pending').length;
+
+    res.json({
+      totalClients: clients.length,
+      activeDisputes,
+      totalApprovedFunding,
+      pendingApplications,
+      totalApplications: apps.length,
+      approvedCount: approvedApps.length,
+      deniedCount: apps.filter(a => a.status === 'denied').length,
+      activePlans: plans.filter(p => p.status === 'active').length,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/dashboard/activity', (req, res) => {
+  try {
+    const recentClients = dbAll('SELECT id, firstName, lastName, createdAt FROM clients ORDER BY createdAt DESC LIMIT 5');
+    const recentApps = dbAll('SELECT a.*, c.firstName, c.lastName FROM applications a LEFT JOIN clients c ON a.clientId = c.id ORDER BY a.createdAt DESC LIMIT 5');
+    const recentDisputes = dbAll('SELECT d.*, c.firstName, c.lastName FROM disputes d LEFT JOIN clients c ON d.clientId = c.id ORDER BY d.createdAt DESC LIMIT 5');
+    const recentChanges = dbAll('SELECT cc.*, c.firstName, c.lastName FROM credit_changes cc LEFT JOIN clients c ON cc.clientId = c.id ORDER BY cc.createdAt DESC LIMIT 5');
+
+    const activity = [];
+
+    recentClients.forEach(c => activity.push({
+      type: 'client', description: `New client added: ${c.firstName} ${c.lastName}`,
+      created_at: c.createdAt
+    }));
+
+    recentApps.forEach(a => {
+      const status = a.status === 'approved' ? `Approved $${(a.approvedAmount || 0).toLocaleString()}` : a.status.charAt(0).toUpperCase() + a.status.slice(1);
+      activity.push({
+        type: 'funding', description: `${a.firstName} ${a.lastName} — ${a.bankName} ${a.product}: ${status}`,
+        created_at: a.createdAt
+      });
+    });
+
+    recentDisputes.forEach(d => activity.push({
+      type: 'dispute', description: `${d.firstName} ${d.lastName} — ${d.type} dispute (${d.bureau}): ${d.status}`,
+      created_at: d.createdAt
+    }));
+
+    recentChanges.forEach(cc => {
+      const delta = (cc.scoreDelta > 0 ? '+' : '') + cc.scoreDelta;
+      activity.push({
+        type: 'credit', description: `${cc.firstName} ${cc.lastName} — ${cc.bureau} score ${delta} (${cc.previousScore} → ${cc.newScore})`,
+        created_at: cc.createdAt
+      });
+    });
+
+    activity.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    res.json(activity.slice(0, 10));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Disputes
 // ---------------------------------------------------------------------------
 app.get('/api/clients/:id/disputes', (req, res) => {
