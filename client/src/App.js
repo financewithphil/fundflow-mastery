@@ -5,6 +5,7 @@ import DisputeLetters from './pages/DisputeLetters';
 import FundingPlans from './pages/FundingPlans';
 import BankExplorer from './pages/BankExplorer';
 import BusinessSetup from './pages/BusinessSetup';
+import ClientPortal from './pages/ClientPortal';
 
 // ── API Helper ──────────────────────────────────────────────
 export const api = async (path, options = {}) => {
@@ -72,7 +73,7 @@ const Icons = {
 };
 
 // ── PIN Auth Screen ─────────────────────────────────────────
-function PinScreen({ onAuth }) {
+function PinScreen({ onAuth, onClientPortal }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -126,6 +127,16 @@ function PinScreen({ onAuth }) {
             {loading ? 'Verifying...' : 'Unlock'}
           </button>
         </form>
+        <div className="client-portal-link">
+          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Are you a client?</span>{' '}
+          <button
+            type="button"
+            className="client-portal-link-btn"
+            onClick={onClientPortal}
+          >
+            Access your portal here
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -136,6 +147,11 @@ export default function App() {
   const [authed, setAuthed] = useState(() => sessionStorage.getItem('ffm_auth') === 'true');
   const [activePage, setActivePage] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [showClientPortal, setShowClientPortal] = useState(() => {
+    // Check URL param or existing client auth
+    const params = new URLSearchParams(window.location.search);
+    return params.get('portal') === '1' || (!!sessionStorage.getItem('ffm_client_auth') && !sessionStorage.getItem('ffm_auth'));
+  });
 
   // Allow navigating to a client from dashboard quick actions
   const [navContext, setNavContext] = useState(null);
@@ -145,8 +161,17 @@ export default function App() {
     setNavContext(context);
   }, []);
 
+  // Show client portal if toggled on and not admin-authed
+  if (showClientPortal && !authed) {
+    return (
+      <ClientPortal
+        onSignOut={() => setShowClientPortal(false)}
+      />
+    );
+  }
+
   if (!authed) {
-    return <PinScreen onAuth={() => setAuthed(true)} />;
+    return <PinScreen onAuth={() => setAuthed(true)} onClientPortal={() => setShowClientPortal(true)} />;
   }
 
   const renderPage = () => {

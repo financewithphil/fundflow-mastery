@@ -139,6 +139,32 @@ async function initDatabase() {
     FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE
   )`);
 
+  db.run(`CREATE TABLE IF NOT EXISTS client_logins (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    clientId INTEGER NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    passwordHash TEXT NOT NULL,
+    lastLogin TEXT,
+    createdAt TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE
+  )`);
+
+  db.run(`CREATE TABLE IF NOT EXISTS credit_changes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    clientId INTEGER NOT NULL,
+    changeDate TEXT,
+    bureau TEXT CHECK(bureau IN ('Experian','Equifax','TransUnion')),
+    previousScore INTEGER,
+    newScore INTEGER,
+    scoreDelta INTEGER,
+    factor TEXT,
+    factorType TEXT CHECK(factorType IN ('positive','negative','neutral')),
+    action TEXT,
+    notes TEXT,
+    createdAt TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE
+  )`);
+
   persistDb();
   console.log('Database initialized');
 }
@@ -1091,6 +1117,423 @@ app.post('/api/upload/credit-report', upload.single('file'), (req, res) => {
       size: req.file.size,
       message: 'Credit report uploaded successfully. PDF parsing can be added with pdf-parse library.',
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Client Portal Auth
+// ---------------------------------------------------------------------------
+app.post('/api/client-auth', (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ success: false, error: 'Email and password are required' });
+    }
+
+    const login = dbGet('SELECT * FROM client_logins WHERE email = ?', [email]);
+    if (!login || login.passwordHash !== password) {
+      return res.status(401).json({ success: false, error: 'Invalid email or password' });
+    }
+
+    // Update lastLogin
+    dbRun('UPDATE client_logins SET lastLogin = ? WHERE id = ?', [new Date().toISOString(), login.id]);
+
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [login.clientId]);
+    res.json({
+      success: true,
+      clientId: login.clientId,
+      firstName: client ? client.firstName : null,
+      lastName: client ? client.lastName : null,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Admin: Manage Client Logins
+// ---------------------------------------------------------------------------
+app.post('/api/clients/:id/create-login', (req, res) => {
+  try {
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    // Check if login already exists for this client
+    const existing = dbGet('SELECT * FROM client_logins WHERE clientId = ?', [req.params.id]);
+    if (existing) {
+      return res.status(400).json({ error: 'Login already exists for this client. Use PUT to update.' });
+    }
+
+    const now = new Date().toISOString();
+    const { lastId } = dbRun(
+      'INSERT INTO client_logins (clientId, email, passwordHash, createdAt) VALUES (?,?,?,?)',
+      [req.params.id, email, password, now]
+    );
+
+    const login = dbGet('SELECT * FROM client_logins WHERE id = ?', [lastId]);
+    res.status(201).json({ id: login.id, clientId: login.clientId, email: login.email, createdAt: login.createdAt });
+  } catch (err) {
+    if (err.message && err.message.includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/clients/:id/update-login', (req, res) => {
+  try {
+    const login = dbGet('SELECT * FROM client_logins WHERE clientId = ?', [req.params.id]);
+    if (!login) return res.status(404).json({ error: 'No login found for this client' });
+
+    const { email, password } = req.body;
+    dbRun(
+      'UPDATE client_logins SET email = ?, passwordHash = ? WHERE clientId = ?',
+      [email ?? login.email, password ?? login.passwordHash, req.params.id]
+    );
+
+    const updated = dbGet('SELECT * FROM client_logins WHERE clientId = ?', [req.params.id]);
+    res.json({ id: updated.id, clientId: updated.clientId, email: updated.email });
+  } catch (err) {
+    if (err.message && err.message.includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Email already in use' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/clients/:id/login-info', (req, res) => {
+  try {
+    const login = dbGet('SELECT * FROM client_logins WHERE clientId = ?', [req.params.id]);
+    if (!login) {
+      return res.json({ hasLogin: false, email: null, lastLogin: null });
+    }
+    res.json({ hasLogin: true, email: login.email, lastLogin: login.lastLogin });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Client Portal Routes
+// ---------------------------------------------------------------------------
+app.get('/api/portal/profile/:clientId', (req, res) => {
+  try {
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.clientId]);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    res.json(client);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/portal/business-setup/:clientId', (req, res) => {
+  try {
+    const steps = dbAll('SELECT * FROM business_setup WHERE clientId = ? ORDER BY id ASC', [req.params.clientId]);
+    res.json(steps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/portal/funding-plan/:clientId', (req, res) => {
+  try {
+    const plan = dbGet(
+      "SELECT * FROM funding_plans WHERE clientId = ? AND status = 'active' ORDER BY createdAt DESC LIMIT 1",
+      [req.params.clientId]
+    );
+    if (!plan) {
+      // Fall back to the latest plan of any status
+      const latestPlan = dbGet(
+        'SELECT * FROM funding_plans WHERE clientId = ? ORDER BY createdAt DESC LIMIT 1',
+        [req.params.clientId]
+      );
+      return res.json(latestPlan || null);
+    }
+    res.json(plan);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/portal/applications/:clientId', async (req, res) => {
+  try {
+    const apps = dbAll('SELECT * FROM applications WHERE clientId = ? ORDER BY dateApplied DESC', [req.params.clientId]);
+
+    // For denied applications, generate AI next steps
+    const appsWithNextSteps = [];
+    for (const app of apps) {
+      if (app.status === 'denied') {
+        try {
+          const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.clientId]);
+          const nextSteps = await callClaude(
+            `You are a business funding consultant. A client's application was denied. Provide 3-5 brief, specific next steps they should take. Be concise — each step should be 1-2 sentences max. Consider the bank's known requirements, the client's credit profile, and timing strategies.
+
+${BANK_DATABASE}`,
+            `Application denied:
+- Bank: ${app.bankName || 'Unknown'}
+- Bureau: ${app.bureau || 'Unknown'}
+- Product: ${app.product || 'Business Credit Card'}
+- Date Applied: ${app.dateApplied || 'Unknown'}
+- Notes: ${app.notes || 'None'}
+
+Client Credit Scores:
+- Experian: ${client ? client.creditScoreExperian || 'N/A' : 'N/A'}
+- Equifax: ${client ? client.creditScoreEquifax || 'N/A' : 'N/A'}
+- TransUnion: ${client ? client.creditScoreTransUnion || 'N/A' : 'N/A'}
+
+Inquiries:
+- Experian: ${client ? client.totalInquiriesExperian || 0 : 0}
+- Equifax: ${client ? client.totalInquiriesEquifax || 0 : 0}
+- TransUnion: ${client ? client.totalInquiriesTransUnion || 0 : 0}
+
+What should the client do next?`
+          );
+          appsWithNextSteps.push({ ...app, aiNextSteps: nextSteps });
+        } catch (_aiErr) {
+          appsWithNextSteps.push({ ...app, aiNextSteps: null });
+        }
+      } else {
+        appsWithNextSteps.push({ ...app, aiNextSteps: null });
+      }
+    }
+
+    res.json(appsWithNextSteps);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/portal/credit-changes/:clientId', (req, res) => {
+  try {
+    const changes = dbAll('SELECT * FROM credit_changes WHERE clientId = ? ORDER BY changeDate DESC', [req.params.clientId]);
+    res.json(changes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Credit Changes (Admin)
+// ---------------------------------------------------------------------------
+app.get('/api/clients/:id/credit-changes', (req, res) => {
+  try {
+    const changes = dbAll('SELECT * FROM credit_changes WHERE clientId = ? ORDER BY changeDate DESC', [req.params.id]);
+    res.json(changes);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/clients/:id/credit-changes', (req, res) => {
+  try {
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const c = req.body;
+    const scoreDelta = (c.newScore || 0) - (c.previousScore || 0);
+    const now = new Date().toISOString();
+
+    const { lastId } = dbRun(
+      `INSERT INTO credit_changes (clientId, changeDate, bureau, previousScore, newScore, scoreDelta, factor, factorType, action, notes, createdAt)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+      [
+        req.params.id, c.changeDate || now, c.bureau || null,
+        c.previousScore || null, c.newScore || null, scoreDelta,
+        c.factor || null, c.factorType || null, c.action || null,
+        c.notes || null, now,
+      ]
+    );
+
+    const change = dbGet('SELECT * FROM credit_changes WHERE id = ?', [lastId]);
+    res.status(201).json(change);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/credit-changes/:id', (req, res) => {
+  try {
+    const existing = dbGet('SELECT * FROM credit_changes WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Credit change not found' });
+
+    const c = req.body;
+    const newPrev = c.previousScore ?? existing.previousScore;
+    const newNew = c.newScore ?? existing.newScore;
+    const scoreDelta = (newNew || 0) - (newPrev || 0);
+
+    dbRun(
+      `UPDATE credit_changes SET changeDate=?, bureau=?, previousScore=?, newScore=?, scoreDelta=?, factor=?, factorType=?, action=?, notes=?
+       WHERE id=?`,
+      [
+        c.changeDate ?? existing.changeDate, c.bureau ?? existing.bureau,
+        newPrev, newNew, scoreDelta,
+        c.factor ?? existing.factor, c.factorType ?? existing.factorType,
+        c.action ?? existing.action, c.notes ?? existing.notes,
+        req.params.id,
+      ]
+    );
+
+    const updated = dbGet('SELECT * FROM credit_changes WHERE id = ?', [req.params.id]);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/credit-changes/:id', (req, res) => {
+  try {
+    const existing = dbGet('SELECT * FROM credit_changes WHERE id = ?', [req.params.id]);
+    if (!existing) return res.status(404).json({ error: 'Credit change not found' });
+    dbRun('DELETE FROM credit_changes WHERE id = ?', [req.params.id]);
+    res.json({ success: true, message: 'Credit change deleted' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// AI: Generate Corrective Actions
+// ---------------------------------------------------------------------------
+app.post('/api/clients/:id/generate-corrective-actions', async (req, res) => {
+  try {
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+
+    const { bureau, previousScore, newScore, factor } = req.body;
+    if (!bureau || previousScore == null || newScore == null || !factor) {
+      return res.status(400).json({ error: 'bureau, previousScore, newScore, and factor are required' });
+    }
+
+    const scoreDelta = newScore - previousScore;
+
+    const systemPrompt = `You are an expert credit repair and optimization specialist. Generate specific, actionable corrective actions and mitigation strategies based on a credit score change.
+
+CREDIT REPAIR BEST PRACTICES:
+1. Dispute inaccuracies with bureaus under FCRA Section 611 — always verify data accuracy first
+2. Reduce credit utilization below 30% (ideally under 10%) — use AZEO strategy (All Zero Except One)
+3. Become an authorized user on aged accounts (5+ years, low utilization, perfect payment history)
+4. Request credit limit increases (CLIs) on existing cards — soft pull CLIs preferred (Amex, Chase)
+5. Pay collections and charge-offs — negotiate pay-for-delete or settlement letters
+6. Don't close old accounts — average age of accounts matters
+7. Limit new hard inquiries — space applications 30+ days apart, max 3 per bureau per 6 months
+8. Set up automatic payments to prevent future late payments
+9. Use a credit monitoring service to catch issues early
+10. Consider a goodwill letter for one-time late payments on otherwise perfect accounts
+11. Rapid rescore through mortgage broker if time-sensitive (2-3 business days)
+12. Balance transfer to reduce high-utilization cards
+13. Report rent/utilities to bureaus for additional positive tradelines
+
+FORMAT: Return a JSON object with this structure:
+{
+  "analysis": "Brief analysis of what the score change means",
+  "correctiveActions": [
+    { "priority": 1, "action": "Specific action", "expectedImpact": "Expected point improvement", "timeline": "How long" }
+  ],
+  "mitigationStrategies": [
+    { "strategy": "Specific mitigation", "detail": "How to implement" }
+  ]
+}`;
+
+    const userPrompt = `A client's credit score changed. Generate corrective actions and mitigation strategies.
+
+CLIENT: ${client.firstName} ${client.lastName}
+BUREAU: ${bureau}
+PREVIOUS SCORE: ${previousScore}
+NEW SCORE: ${newScore}
+SCORE DELTA: ${scoreDelta > 0 ? '+' : ''}${scoreDelta}
+FACTOR (what changed): ${factor}
+
+CURRENT SCORES:
+- Experian: ${client.creditScoreExperian || 'N/A'}
+- Equifax: ${client.creditScoreEquifax || 'N/A'}
+- TransUnion: ${client.creditScoreTransUnion || 'N/A'}
+
+CURRENT INQUIRIES:
+- Experian: ${client.totalInquiriesExperian || 0}
+- Equifax: ${client.totalInquiriesEquifax || 0}
+- TransUnion: ${client.totalInquiriesTransUnion || 0}
+
+Generate specific corrective actions and mitigation strategies for this score change.`;
+
+    const aiResponse = await callClaude(systemPrompt, userPrompt);
+
+    // Try to parse as JSON, fall back to raw text
+    let parsed;
+    try {
+      parsed = JSON.parse(aiResponse);
+    } catch (_parseErr) {
+      parsed = { raw: aiResponse };
+    }
+
+    res.json(parsed);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bank Locator (AI)
+// ---------------------------------------------------------------------------
+app.post('/api/bank-locator', async (req, res) => {
+  try {
+    const { state, bureauFilter } = req.body;
+    if (!state) {
+      return res.status(400).json({ error: 'state is required' });
+    }
+
+    const systemPrompt = `You are an expert business funding strategist. Generate a comprehensive list of banks available in a given state that offer 0% intro rate business credit cards and lines of credit. Group them by which credit bureau they pull from.
+
+${BANK_DATABASE}
+
+IMPORTANT INSTRUCTIONS:
+1. Include all banks from the database above that operate in the requested state
+2. Add additional regional/local banks, credit unions, and community banks you know about for that state
+3. Group results by bureau pulled (Experian, Equifax, TransUnion, Multiple)
+4. For each bank include: name, product type, typical intro APR period, estimated credit limit range, bureau pulled, and any special requirements
+5. Suggest an optimal application sequence based on bureau rotation to minimize inquiry impact
+6. Reference bankbranchlocator.com as the source clients should use to verify branch availability in their area
+7. Note any state-specific banking regulations or opportunities
+
+FORMAT: Return a JSON object with this structure:
+{
+  "state": "STATE",
+  "banks": {
+    "Experian": [ { "name": "...", "product": "...", "introAPR": "...", "estimatedLimit": "...", "requirements": "...", "notes": "..." } ],
+    "Equifax": [ ... ],
+    "TransUnion": [ ... ],
+    "Multiple": [ ... ]
+  },
+  "optimalSequence": [
+    { "order": 1, "bank": "...", "bureau": "...", "timing": "...", "reasoning": "..." }
+  ],
+  "stateNotes": "Any state-specific info",
+  "verificationNote": "Verify branch availability at bankbranchlocator.com"
+}`;
+
+    const bureauNote = bureauFilter ? `\nFOCUS: Only show banks that pull from ${bureauFilter}.` : '';
+
+    const userPrompt = `List all banks in ${state} that offer 0% intro rate business credit cards and lines of credit.${bureauNote}
+
+Include national banks with branches in ${state}, regional banks, credit unions, and community banks. Group by bureau and suggest an optimal application sequence.`;
+
+    const aiResponse = await callClaude(systemPrompt, userPrompt);
+
+    // Try to parse as JSON, fall back to raw text
+    let parsed;
+    try {
+      parsed = JSON.parse(aiResponse);
+    } catch (_parseErr) {
+      parsed = { raw: aiResponse };
+    }
+
+    res.json(parsed);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
