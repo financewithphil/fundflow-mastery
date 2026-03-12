@@ -794,14 +794,32 @@ app.get('/api/clients/:id/funding-plans', (req, res) => {
   }
 });
 
+// Manual plan creation (for seeding or direct entry)
+app.post('/api/clients/:id/funding-plans', (req, res) => {
+  try {
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    const { planType, content, status } = req.body;
+    const now = new Date().toISOString();
+    const { lastId } = dbRun(
+      `INSERT INTO funding_plans (clientId, planType, planContent, status, createdAt, updatedAt) VALUES (?,?,?,?,?,?)`,
+      [req.params.id, planType || 'full_plan', content || '', status || 'active', now, now]
+    );
+    const plan = dbGet('SELECT * FROM funding_plans WHERE id = ?', [lastId]);
+    res.status(201).json(plan);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/clients/:id/generate-plan', async (req, res) => {
   try {
     const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
     if (!client) return res.status(404).json({ error: 'Client not found' });
 
     const { planType } = req.body;
-    if (!['credit_optimization', 'funding_sequence', 'full'].includes(planType)) {
-      return res.status(400).json({ error: 'Invalid planType. Must be credit_optimization, funding_sequence, or full.' });
+    if (!['credit_optimization', 'funding_sequence', 'full', 'full_plan'].includes(planType)) {
+      return res.status(400).json({ error: 'Invalid planType. Must be credit_optimization, funding_sequence, or full_plan.' });
     }
 
     // Get existing applications for context

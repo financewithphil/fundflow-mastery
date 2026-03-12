@@ -72,7 +72,7 @@ export default function Clients({ navigate, context }) {
     try {
       const [disputes, plans, setup] = await Promise.all([
         api(`/api/clients/${client.id}/disputes`).catch(() => []),
-        api(`/api/clients/${client.id}/plans`).catch(() => []),
+        api(`/api/clients/${client.id}/funding-plans`).catch(() => []),
         api(`/api/clients/${client.id}/business-setup`).catch(() => null),
       ]);
       setClientDisputes(Array.isArray(disputes) ? disputes : (disputes.disputes || []));

@@ -43,7 +43,7 @@ export default function FundingPlans({ navigate, context }) {
     if (!selectedClientId) { setPlans([]); return; }
     setLoading(true);
     try {
-      const data = await api(`/api/clients/${selectedClientId}/plans`);
+      const data = await api(`/api/clients/${selectedClientId}/funding-plans`);
       setPlans(Array.isArray(data) ? data : (data.plans || []));
     } catch (_) { setPlans([]); }
     finally { setLoading(false); }
@@ -71,7 +71,7 @@ export default function FundingPlans({ navigate, context }) {
     try {
       const result = await api(`/api/clients/${selectedClientId}/generate-plan`, {
         method: 'POST',
-        body: JSON.stringify({ plan_type: planType }),
+        body: JSON.stringify({ planType }),
       });
       setGeneratedPlan(result);
     } catch (err) {
@@ -86,15 +86,12 @@ export default function FundingPlans({ navigate, context }) {
     setSaving(true);
     setError('');
     try {
-      await api(`/api/clients/${selectedClientId}/plans`, {
-        method: 'POST',
-        body: JSON.stringify({
-          plan_type: planType,
-          content: generatedPlan.plan || generatedPlan.content || JSON.stringify(generatedPlan),
-          status: 'active',
-        }),
+      // generate-plan already saved as 'draft' — activate it via PUT
+      await api(`/api/funding-plans/${generatedPlan.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'active' }),
       });
-      setSuccess('Plan saved successfully.');
+      setSuccess('Plan saved and activated successfully.');
       setGeneratedPlan(null);
       loadPlans();
     } catch (err) {
@@ -149,7 +146,7 @@ export default function FundingPlans({ navigate, context }) {
           >
             <option value="">-- Select a client --</option>
             {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.first_name} {c.last_name}{c.business_name ? ` (${c.business_name})` : ''}</option>
+              <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.businessName ? ` (${c.businessName})` : ''}</option>
             ))}
           </select>
         </div>
@@ -167,27 +164,27 @@ export default function FundingPlans({ navigate, context }) {
             <div className="bureau-health">
               <div className="bureau-card">
                 <div className="bureau-card-name" style={{ color: '#60a5fa' }}>Experian</div>
-                <div className={`bureau-card-count ${getInquiryColor(selectedClient.inquiries_experian || 0)}`}>
-                  {selectedClient.inquiries_experian || 0}
+                <div className={`bureau-card-count ${getInquiryColor(selectedClient.totalInquiriesExperian || 0)}`}>
+                  {selectedClient.totalInquiriesExperian || 0}
                 </div>
                 <div className="bureau-card-max">of 3 max inquiries</div>
-                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>Score: {selectedClient.credit_score_experian || '--'}</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>Score: {selectedClient.creditScoreExperian || '--'}</div>
               </div>
               <div className="bureau-card">
                 <div className="bureau-card-name" style={{ color: '#a855f7' }}>Equifax</div>
-                <div className={`bureau-card-count ${getInquiryColor(selectedClient.inquiries_equifax || 0)}`}>
-                  {selectedClient.inquiries_equifax || 0}
+                <div className={`bureau-card-count ${getInquiryColor(selectedClient.totalInquiriesEquifax || 0)}`}>
+                  {selectedClient.totalInquiriesEquifax || 0}
                 </div>
                 <div className="bureau-card-max">of 3 max inquiries</div>
-                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>Score: {selectedClient.credit_score_equifax || '--'}</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>Score: {selectedClient.creditScoreEquifax || '--'}</div>
               </div>
               <div className="bureau-card">
                 <div className="bureau-card-name" style={{ color: '#2dd4bf' }}>TransUnion</div>
-                <div className={`bureau-card-count ${getInquiryColor(selectedClient.inquiries_transunion || 0)}`}>
-                  {selectedClient.inquiries_transunion || 0}
+                <div className={`bureau-card-count ${getInquiryColor(selectedClient.totalInquiriesTransunion || 0)}`}>
+                  {selectedClient.totalInquiriesTransunion || 0}
                 </div>
                 <div className="bureau-card-max">of 3 max inquiries</div>
-                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>Score: {selectedClient.credit_score_transunion || '--'}</div>
+                <div style={{ marginTop: 6, fontSize: 13, fontWeight: 600 }}>Score: {selectedClient.creditScoreTransunion || '--'}</div>
               </div>
             </div>
           )}
@@ -269,19 +266,19 @@ export default function FundingPlans({ navigate, context }) {
               ) : plans.length === 0 ? (
                 <div className="empty-state">
                   <h3>No saved plans</h3>
-                  <p>Generate and save a plan for {selectedClient?.first_name}.</p>
+                  <p>Generate and save a plan for {selectedClient?.firstName}.</p>
                 </div>
               ) : viewPlan ? (
                 <div>
                   <div className="card-header">
-                    <h3 className="card-title">{viewPlan.plan_type || viewPlan.type} Plan</h3>
+                    <h3 className="card-title">{viewPlan.planType || viewPlan.type} Plan</h3>
                     <div className="btn-group">
                       <button className="btn btn-secondary btn-sm" onClick={() => setViewPlan(null)}>Back to List</button>
                     </div>
                   </div>
                   <div style={{ marginBottom: 8 }}>
                     <span className={`badge badge-${viewPlan.status}`}>{viewPlan.status}</span>
-                    {viewPlan.created_at && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>{new Date(viewPlan.created_at).toLocaleDateString()}</span>}
+                    {viewPlan.createdAt && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>{new Date(viewPlan.createdAt).toLocaleDateString()}</span>}
                   </div>
                   <div className="plan-content">{viewPlan.content || viewPlan.plan || 'No content.'}</div>
                 </div>
@@ -294,9 +291,9 @@ export default function FundingPlans({ navigate, context }) {
                     <tbody>
                       {plans.map(p => (
                         <tr key={p.id} onClick={() => setViewPlan(p)}>
-                          <td style={{ fontWeight: 600 }}>{p.plan_type || p.type}</td>
+                          <td style={{ fontWeight: 600 }}>{p.planType || p.type}</td>
                           <td><span className={`badge badge-${p.status}`}>{p.status}</span></td>
-                          <td>{p.created_at ? new Date(p.created_at).toLocaleDateString() : '--'}</td>
+                          <td>{p.createdAt ? new Date(p.createdAt).toLocaleDateString() : '--'}</td>
                         </tr>
                       ))}
                     </tbody>
