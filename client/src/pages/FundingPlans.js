@@ -121,7 +121,7 @@ export default function FundingPlans({ navigate, context }) {
     }
   };
 
-  const planContent = generatedPlan?.plan || generatedPlan?.content || (generatedPlan ? JSON.stringify(generatedPlan, null, 2) : '');
+  const planContent = generatedPlan?.planContent || generatedPlan?.plan || generatedPlan?.content || (generatedPlan ? JSON.stringify(generatedPlan, null, 2) : '');
 
   return (
     <div>
@@ -280,7 +280,7 @@ export default function FundingPlans({ navigate, context }) {
                     <span className={`badge badge-${viewPlan.status}`}>{viewPlan.status}</span>
                     {viewPlan.createdAt && <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 8 }}>{new Date(viewPlan.createdAt).toLocaleDateString()}</span>}
                   </div>
-                  <div className="plan-content">{viewPlan.content || viewPlan.plan || 'No content.'}</div>
+                  <div className="plan-content">{viewPlan.planContent || viewPlan.content || viewPlan.plan || 'No content.'}</div>
                 </div>
               ) : (
                 <div className="table-wrapper">
