@@ -83,11 +83,11 @@ export default function DisputeLetters({ navigate, context }) {
 
     try {
       const payload = {
-        dispute_type: disputeType,
+        type: disputeType,
         bureau,
-        creditor_name: creditorName,
-        inquiry_date: inquiryDate,
-        account_number: accountNumber,
+        creditorName,
+        inquiryDate,
+        accountNumber,
         amount,
         reason,
       };
@@ -107,7 +107,7 @@ export default function DisputeLetters({ navigate, context }) {
 
       if (template && client) {
         let letter = template.body
-          .replace(/\[CLIENT_NAME\]/g, `${client.first_name} ${client.last_name}`)
+          .replace(/\[CLIENT_NAME\]/g, `${client.firstName} ${client.lastName}`)
           .replace(/\[CLIENT_ADDRESS\]/g, client.address || '[Address]')
           .replace(/\[CLIENT_CITY_STATE_ZIP\]/g, [client.city, client.state, client.zip].filter(Boolean).join(', ') || '[City, State ZIP]')
           .replace(/\[DATE\]/g, new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))
@@ -156,14 +156,13 @@ export default function DisputeLetters({ navigate, context }) {
       await api(`/api/clients/${selectedClientId}/disputes`, {
         method: 'POST',
         body: JSON.stringify({
-          dispute_type: generatedLetter.dispute_type || disputeType,
+          type: generatedLetter.dispute_type || generatedLetter.type || disputeType,
           bureau: generatedLetter.bureau || bureau,
-          creditor_name: generatedLetter.creditor_name || creditorName,
-          inquiry_date: inquiryDate,
-          account_number: accountNumber,
+          creditorName: generatedLetter.creditor_name || generatedLetter.creditorName || creditorName,
+          inquiryDate,
+          accountNumber,
           amount,
-          reason,
-          letter_content: generatedLetter.letter_content || generatedLetter.letter || generatedLetter.content,
+          letterContent: generatedLetter.letter_content || generatedLetter.letterContent || generatedLetter.letter || generatedLetter.content,
           status: 'draft',
         }),
       });
@@ -213,7 +212,7 @@ export default function DisputeLetters({ navigate, context }) {
           >
             <option value="">-- Select a client --</option>
             {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.first_name} {c.last_name}{c.business_name ? ` (${c.business_name})` : ''}</option>
+              <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.businessName ? ` (${c.businessName})` : ''}</option>
             ))}
           </select>
         </div>
@@ -341,12 +340,12 @@ export default function DisputeLetters({ navigate, context }) {
               ) : disputes.length === 0 ? (
                 <div className="empty-state">
                   <h3>No disputes yet</h3>
-                  <p>Generate your first dispute letter for {selectedClient?.first_name}.</p>
+                  <p>Generate your first dispute letter for {selectedClient?.firstName}.</p>
                 </div>
               ) : previewDispute ? (
                 <div>
                   <div className="card-header">
-                    <h3 className="card-title">{previewDispute.dispute_type || previewDispute.type} - {previewDispute.creditor_name}</h3>
+                    <h3 className="card-title">{DISPUTE_TYPES[previewDispute.type]?.name || previewDispute.type || previewDispute.dispute_type} — {previewDispute.creditorName || previewDispute.creditor_name}</h3>
                     <div className="btn-group">
                       <button className="btn btn-secondary btn-sm" onClick={() => setPreviewDispute(null)}>Back to List</button>
                       <button className="btn btn-secondary btn-sm" onClick={handlePrint}>Print</button>
@@ -358,7 +357,7 @@ export default function DisputeLetters({ navigate, context }) {
                     <span className={`badge badge-${previewDispute.status}`}>{previewDispute.status}</span>
                   </div>
                   <div className="letter-preview">
-                    {previewDispute.letter_content || previewDispute.content || 'No letter content saved.'}
+                    {previewDispute.letterContent || previewDispute.letter_content || previewDispute.content || 'No letter content saved.'}
                   </div>
                 </div>
               ) : (
@@ -376,11 +375,11 @@ export default function DisputeLetters({ navigate, context }) {
                     <tbody>
                       {disputes.map((d) => (
                         <tr key={d.id} onClick={() => setPreviewDispute(d)}>
-                          <td>{DISPUTE_TYPES[d.dispute_type]?.name || d.dispute_type || d.type}</td>
+                          <td>{DISPUTE_TYPES[d.type]?.name || d.type || d.dispute_type || '--'}</td>
                           <td><span className={`badge-bureau badge-${d.bureau}`}>{d.bureau}</span></td>
-                          <td>{d.creditor_name}</td>
+                          <td>{d.creditorName || d.creditor_name || '--'}</td>
                           <td><span className={`badge badge-${d.status}`}>{d.status}</span></td>
-                          <td>{d.created_at ? new Date(d.created_at).toLocaleDateString() : '--'}</td>
+                          <td>{(d.createdAt || d.created_at) ? new Date(d.createdAt || d.created_at).toLocaleDateString() : '--'}</td>
                         </tr>
                       ))}
                     </tbody>

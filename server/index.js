@@ -694,8 +694,9 @@ app.post('/api/clients/:id/disputes', (req, res) => {
         now, now,
       ]
     );
-    const dispute = dbGet('SELECT * FROM disputes WHERE id = ?', [lastId]);
-    res.status(201).json(dispute);
+    let dispute = dbGet('SELECT * FROM disputes WHERE id = ?', [lastId]);
+    if (!dispute) dispute = dbGet('SELECT * FROM disputes WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(dispute || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -786,8 +787,9 @@ Please generate a complete, ready-to-send dispute letter appropriate for the dis
       [req.params.id, type, bureau, creditorName, accountNumber, inquiryDate, amount, 'draft', letterContent, now, now]
     );
 
-    const dispute = dbGet('SELECT * FROM disputes WHERE id = ?', [lastId]);
-    res.status(201).json(dispute);
+    let dispute = dbGet('SELECT * FROM disputes WHERE id = ?', [lastId]);
+    if (!dispute) dispute = dbGet('SELECT * FROM disputes WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(dispute || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -816,8 +818,9 @@ app.post('/api/clients/:id/funding-plans', (req, res) => {
       `INSERT INTO funding_plans (clientId, planType, planContent, status, createdAt, updatedAt) VALUES (?,?,?,?,?,?)`,
       [req.params.id, planType || 'full_plan', content || '', status || 'active', now, now]
     );
-    const plan = dbGet('SELECT * FROM funding_plans WHERE id = ?', [lastId]);
-    res.status(201).json(plan);
+    let plan = dbGet('SELECT * FROM funding_plans WHERE id = ?', [lastId]);
+    if (!plan) plan = dbGet('SELECT * FROM funding_plans WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(plan || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -881,8 +884,9 @@ Generate a detailed, personalized ${planType.replace(/_/g, ' ')} plan with speci
       [req.params.id, planType, planContent, 'draft', now, now]
     );
 
-    const plan = dbGet('SELECT * FROM funding_plans WHERE id = ?', [lastId]);
-    res.status(201).json(plan);
+    let plan = dbGet('SELECT * FROM funding_plans WHERE id = ?', [lastId]);
+    if (!plan) plan = dbGet('SELECT * FROM funding_plans WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(plan || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -933,8 +937,9 @@ app.post('/api/clients/:id/applications', (req, res) => {
         a.status || 'pending', a.approvedAmount || null, a.notes || null, now,
       ]
     );
-    const application = dbGet('SELECT * FROM applications WHERE id = ?', [lastId]);
-    res.status(201).json(application);
+    let application = dbGet('SELECT * FROM applications WHERE id = ?', [lastId]);
+    if (!application) application = dbGet('SELECT * FROM applications WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(application || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1074,6 +1079,26 @@ app.get('/api/clients/:id/business-setup', (req, res) => {
   }
 });
 
+// Add individual business setup step
+app.post('/api/clients/:id/business-setup', (req, res) => {
+  try {
+    const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
+    if (!client) return res.status(404).json({ error: 'Client not found' });
+    const { stepName, status, notes } = req.body;
+    const now = new Date().toISOString();
+    const { lastId } = dbRun(
+      'INSERT INTO business_setup (clientId, stepName, status, notes, createdAt) VALUES (?,?,?,?,?)',
+      [req.params.id, stepName || null, status || 'pending', notes || null, now]
+    );
+    let step = dbGet('SELECT * FROM business_setup WHERE id = ?', [lastId]);
+    if (!step) step = dbGet('SELECT * FROM business_setup WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(step || { id: lastId });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Initialize all 9 setup steps at once
 app.post('/api/clients/:id/business-setup/init', (req, res) => {
   try {
     const client = dbGet('SELECT * FROM clients WHERE id = ?', [req.params.id]);
@@ -1492,8 +1517,9 @@ app.post('/api/clients/:id/credit-changes', (req, res) => {
       ]
     );
 
-    const change = dbGet('SELECT * FROM credit_changes WHERE id = ?', [lastId]);
-    res.status(201).json(change);
+    let change = dbGet('SELECT * FROM credit_changes WHERE id = ?', [lastId]);
+    if (!change) change = dbGet('SELECT * FROM credit_changes WHERE clientId = ? ORDER BY id DESC LIMIT 1', [req.params.id]);
+    res.status(201).json(change || { id: lastId });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

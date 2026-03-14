@@ -162,7 +162,7 @@ export default function BusinessSetup({ navigate, context }) {
           >
             <option value="">-- Select a client --</option>
             {clients.map(c => (
-              <option key={c.id} value={c.id}>{c.first_name} {c.last_name}{c.business_name ? ` (${c.business_name})` : ''}</option>
+              <option key={c.id} value={c.id}>{c.firstName} {c.lastName}{c.businessName ? ` (${c.businessName})` : ''}</option>
             ))}
           </select>
         </div>
@@ -179,7 +179,7 @@ export default function BusinessSetup({ navigate, context }) {
         <div className="card" style={{ textAlign: 'center', padding: 48 }}>
           <h3 style={{ marginBottom: 8, color: 'var(--text-secondary)' }}>No Setup Started</h3>
           <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 20 }}>
-            Initialize the 9-step business setup checklist for {selectedClient?.first_name}.
+            Initialize the 9-step business setup checklist for {selectedClient?.firstName}.
           </p>
           <button className="btn btn-primary" onClick={handleInit} disabled={initializing}>
             {initializing ? <><div className="spinner" /> Initializing...</> : (
@@ -197,7 +197,7 @@ export default function BusinessSetup({ navigate, context }) {
             <div className="card-header">
               <h3 className="card-title">
                 Setup Progress
-                {selectedClient?.business_name && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> — {selectedClient.business_name}</span>}
+                {selectedClient?.businessName && <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}> — {selectedClient.business_name}</span>}
               </h3>
               <span style={{ fontSize: 24, fontWeight: 700, color: 'var(--accent-gold)' }}>{progressPct}%</span>
             </div>

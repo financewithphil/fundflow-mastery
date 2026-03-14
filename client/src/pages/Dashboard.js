@@ -163,7 +163,7 @@ export default function Dashboard({ navigate }) {
                   <div>
                     <div className="activity-text">{item.description || item.text || item.message}</div>
                     <div className="activity-time">
-                      {item.created_at ? new Date(item.created_at).toLocaleDateString() : item.time || ''}
+                      {(item.createdAt || item.created_at) ? new Date(item.createdAt || item.created_at).toLocaleDateString() : item.time || ''}
                     </div>
                   </div>
                 </li>
